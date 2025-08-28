@@ -1,0 +1,68 @@
+# Whispers of Self - Simulation Configuration
+
+# Basic simulation parameters
+simulation:
+  initial_population: 10
+  total_days: 50
+  random_seed: 42
+
+# Resource and survival parameters
+resources:
+  spawn_rate: 25.0  # Poisson lambda for daily resource spawning
+  survival_threshold: 5  # Minimum resources needed to survive
+  reproduction_cost: 2  # Cost per offspring
+  max_offspring_per_day: 2  # Maximum offspring per agent per day
+
+# Evolution parameters
+evolution:
+  mutation_rate: 0.05  # Probability of mutation during reproduction
+  type_weights:  # Initial distribution of agent types
+    altruist: 0.33
+    egoist: 0.33
+    pragmatist: 0.34
+
+# Two-phase simulation parameters
+phases:
+  snapshot_day: 15  # Day to transition from Phase A to Phase B
+  big_resource_size: 50  # Size of big resource in Phase B
+  big_resource_probability: 0.8  # Probability of big resource appearing daily
+
+# Resource allocation mode
+allocation:
+  mode: "proportional"  # "proportional" or "sequential"
+
+# Agent personality parameters
+agents:
+  altruist:
+    request_multiplier: 0.7
+    negotiation_demand: 0.5
+    acceptance_threshold: 0.3
+    greed_index: 0.2
+  
+  egoist:
+    request_multiplier: 1.5
+    negotiation_demand: 0.7
+    acceptance_threshold: 0.4
+    greed_index: 0.8
+  
+  pragmatist:
+    request_multiplier: 1.0
+    negotiation_demand: 0.55
+    acceptance_threshold: 0.35
+    greed_index: 0.5
+
+# Experiment parameters
+experiments:
+  n_simulations: 5  # Number of simulations to run for experiments
+  parameter_sweeps:
+    resource_spawn_rates: [15.0, 20.0, 25.0, 30.0, 35.0]
+    initial_egoist_fractions: [0.0, 0.25, 0.5, 0.75, 1.0]
+    mutation_rates: [0.01, 0.05, 0.1, 0.15, 0.2]
+
+# Output and visualization
+output:
+  save_plots: true
+  plot_format: "png"
+  plot_dpi: 300
+  save_metrics: true
+  metrics_format: "csv"
