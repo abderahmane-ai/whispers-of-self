@@ -18,10 +18,19 @@ class AgentState:
     agent_type: str
     age: int = 0
     alive: bool = True
-    resources_reserve: int = 0
     reputation: float = 0.5
     harvest_history: List[int] = field(default_factory=list)
     cooperation_history: List[bool] = field(default_factory=list)
+    
+    # Survival and reproduction economy
+    resources_reserve: int = 0
+    daily_need: int = 3
+    reproduction_reserve: int = 20
+    reproduction_cost: int = 10
+
+    # Spatial exploration (discrete grid coordinates)
+    position_x: int = 0
+    position_y: int = 0
     
     # Strategy parameters
     request_multiplier: float = 1.0
@@ -79,26 +88,43 @@ class BaseAgent(ABC):
         """Increment the agent's age by one day."""
         self.state.age += 1
     
+    def receive_resources(self, amount: int) -> None:
+        """Receive resources (from environment/negotiation) and log harvest history."""
+        if amount <= 0:
+            # Still record zero for history consistency
+            self.state.harvest_history.append(0)
+        else:
+            self.state.resources_reserve += amount
+            self.state.harvest_history.append(amount)
     def add_resources(self, amount: int) -> None:
-        """Add resources to the agent's reserve."""
-        self.state.resources_reserve += amount
-        self.state.harvest_history.append(amount)
+        """Backward-compatible alias to receive resources into reserve."""
+        self.receive_resources(amount)
+
         
         # Keep only last 10 harvests for memory
         if len(self.state.harvest_history) > 10:
             self.state.harvest_history.pop(0)
     
     def consume_resources(self, amount: int) -> bool:
-        """
-        Consume resources from the agent's reserve.
-        
-        Returns:
-            True if the agent has enough resources, False otherwise.
-        """
+        """Consume resources from reserve; return True if fully satisfied."""
+        if amount <= 0:
+            return True
         if self.state.resources_reserve >= amount:
             self.state.resources_reserve -= amount
             return True
+        # Not enough to cover amount
+        self.state.resources_reserve = 0
         return False
+
+    def perform_daily_upkeep(self) -> None:
+        """Ensure today's collected resources meet daily need; die if insufficient.
+
+        Note: No reserves are carried across days. This method only verifies that
+        the agent has collected at least `daily_need` today. Any surplus does not
+        roll over and should be reset by `start_new_day`.
+        """
+        if self.state.resources_reserve < self.state.daily_need:
+            self.die()
     
     def update_reputation(self, cooperation_success: bool) -> None:
         """
@@ -131,48 +157,7 @@ class BaseAgent(ABC):
         """
         recent_harvests = self.state.harvest_history[-days:] if self.state.harvest_history else [0]
         return sum(recent_harvests) / len(recent_harvests)
-    
-    @abstractmethod
-    def calculate_request(self, total_resources: int, population_size: int) -> int:
-        """
-        Calculate how many resources the agent will request.
         
-        Args:
-            total_resources: Total resources available today
-            population_size: Current population size
-            
-        Returns:
-            Number of resources to request
-        """
-        pass
-    
-    @abstractmethod
-    def negotiate_demand(self, partner_reputation: float) -> float:
-        """
-        Calculate negotiation demand when cooperating with another agent.
-        
-        Args:
-            partner_reputation: Reputation of the potential partner
-            
-        Returns:
-            Demand as a fraction (0.0 to 1.0)
-        """
-        pass
-    
-    @abstractmethod
-    def will_accept_offer(self, partner_demand: float, partner_reputation: float) -> bool:
-        """
-        Determine if the agent will accept a partner's offer.
-        
-        Args:
-            partner_demand: Partner's demand as a fraction
-            partner_reputation: Partner's reputation
-            
-        Returns:
-            True if the agent accepts the offer
-        """
-        pass
-    
     def reproduce(self, mutation_rate: float = 0.05) -> Optional['BaseAgent']:
         """
         Create an offspring agent with potential mutations.
@@ -183,8 +168,23 @@ class BaseAgent(ABC):
         Returns:
             New agent instance or None if reproduction fails
         """
-        # This will be implemented by concrete agent classes
+        # Gate reproduction on today's collected resources; subclasses should call this method first
+        if not self.can_reproduce():
+            return None
+        # Subclasses create the actual offspring; after success, charge cost
         return None
+
+    def can_reproduce(self) -> bool:
+        """Check whether the agent has enough collected today to reproduce."""
+        return self.state.alive and self.state.resources_reserve >= self.state.reproduction_reserve
+
+    def charge_reproduction_cost(self) -> None:
+        """Deduct reproduction cost from today's collected resources after reproduction."""
+        self.consume_resources(self.state.reproduction_cost)
+
+    def start_new_day(self) -> None:
+        """Reset per-day resource counters (no reserves carried over)."""
+        self.state.resources_reserve = 0
     
     def to_dict(self) -> Dict:
         """Convert agent state to dictionary for serialization."""
@@ -193,12 +193,16 @@ class BaseAgent(ABC):
             'agent_type': self.state.agent_type,
             'age': self.state.age,
             'alive': self.state.alive,
-            'resources_reserve': self.state.resources_reserve,
             'reputation': self.state.reputation,
+            'resources_reserve': self.state.resources_reserve,
+            'resource_reserve': self.state.resources_reserve,  # alias for compatibility
+            'daily_need': self.state.daily_need,
             'request_multiplier': self.state.request_multiplier,
             'negotiation_demand': self.state.negotiation_demand,
             'acceptance_threshold': self.state.acceptance_threshold,
             'greed_index': self.state.greed_index,
+            'reproduction_reserve': self.state.reproduction_reserve,
+            'reproduction_cost': self.state.reproduction_cost,
         }
     
     def __str__(self) -> str:
@@ -209,3 +213,17 @@ class BaseAgent(ABC):
         """Detailed string representation of the agent."""
         return (f"{self.__class__.__name__}(id={self.id[:8]}, type={self.agent_type}, "
                 f"age={self.age}, alive={self.alive}, reputation={self.reputation:.2f})")
+
+    # --- Exploration and goals ---
+    def set_position(self, x: int, y: int) -> None:
+        """Set the agent's grid position."""
+        self.state.position_x = x
+        self.state.position_y = y
+
+    def get_position(self) -> tuple[int, int]:
+        """Get the agent's grid position."""
+        return (self.state.position_x, self.state.position_y)
+
+    def desired_intake_today(self) -> int:
+        """How much the agent strives to collect today based on traits."""
+        return max(self.state.daily_need, int(round(self.state.daily_need * self.state.request_multiplier)))

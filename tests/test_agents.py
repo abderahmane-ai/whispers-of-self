@@ -1,5 +1,4 @@
 import math
-import random
 import pytest
 
 from src.whispers.agents.base_agent import BaseAgent
@@ -12,15 +11,6 @@ class DummyAgent(BaseAgent):
     def __init__(self, **kwargs):
         kwargs.setdefault("agent_type", "dummy")
         super().__init__(**kwargs)
-
-    def calculate_request(self, total_resources: int, population_size: int) -> int:
-        return 1
-
-    def negotiate_demand(self, partner_reputation: float) -> float:
-        return 0.5
-
-    def will_accept_offer(self, partner_demand: float, partner_reputation: float) -> bool:
-        return True
 
 
 def test_base_agent_state_and_resources():
@@ -71,35 +61,18 @@ def test_base_agent_reputation_and_average_harvest():
 
 
 @pytest.mark.parametrize("agent_cls", [Altruist, Egoist, Pragmatist])
-def test_personality_agents_calculate_request_and_acceptance(agent_cls):
-    random.seed(0)
+def test_personality_agents_desired_intake_at_least_daily_need(agent_cls):
     agent = agent_cls()
-    total_resources = 100
-    population = 10
-
-    # Request is a positive integer and at least 1
-    req = agent.calculate_request(total_resources, population)
-    assert isinstance(req, int)
-    assert req >= 1
-
-    # Offers meeting threshold are accepted
-    my_threshold = agent.state.acceptance_threshold
-    partner_demand = 1.0 - my_threshold
-    assert agent.will_accept_offer(partner_demand, partner_reputation=0.5) is True
+    desired = agent.desired_intake_today()
+    assert isinstance(desired, int)
+    assert desired >= agent.state.daily_need
 
 
-@pytest.mark.parametrize("agent_cls,low,high", [
-    (Altruist, 0.3, 0.7),
-    (Egoist, 0.5, 0.9),
-    (Pragmatist, 0.4, 0.7),
-])
-def test_personality_agents_negotiate_demand_ranges(agent_cls, low, high):
-    random.seed(1)
-    agent = agent_cls()
-    d1 = agent.negotiate_demand(partner_reputation=0.2)
-    d2 = agent.negotiate_demand(partner_reputation=0.9)
-    for d in (d1, d2):
-        assert low <= d <= high
+def test_no_negotiation_interfaces_present():
+    agent = Altruist()
+    assert not hasattr(agent, "calculate_request")
+    assert not hasattr(agent, "negotiate_demand")
+    assert not hasattr(agent, "will_accept_offer")
 
 
 def test_to_dict_contains_key_fields():
