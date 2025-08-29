@@ -25,8 +25,8 @@ class AgentState:
     # Survival and reproduction economy
     resources_reserve: int = 0
     daily_need: int = 3
-    reproduction_reserve: int = 20
-    reproduction_cost: int = 10
+    reproduction_reserve: int = 8
+    reproduction_cost: int = 8
 
     # Spatial exploration (discrete grid coordinates)
     position_x: int = 0
@@ -37,6 +37,9 @@ class AgentState:
     negotiation_demand: float = 0.5
     acceptance_threshold: float = 0.3
     greed_index: float = 0.5
+    
+    # Reproduction tracking
+    newborn: bool = False
 
 
 class BaseAgent(ABC):
@@ -96,6 +99,7 @@ class BaseAgent(ABC):
         else:
             self.state.resources_reserve += amount
             self.state.harvest_history.append(amount)
+            
     def add_resources(self, amount: int) -> None:
         """Backward-compatible alias to receive resources into reserve."""
         self.receive_resources(amount)

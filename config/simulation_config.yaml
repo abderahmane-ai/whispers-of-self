@@ -8,9 +8,9 @@ simulation:
 
 # Resource and survival parameters
 resources:
-  spawn_rate: 25.0  # Poisson lambda for daily resource spawning
+  spawn_rate: 25.0  # Poisson lambda for daily resource spawning (will be auto-calculated)
   survival_threshold: 5  # Minimum resources needed to survive
-  reproduction_cost: 2  # Cost per offspring
+  reproduction_cost: 8  # Cost per offspring
   max_offspring_per_day: 2  # Maximum offspring per agent per day
 
 # Evolution parameters
